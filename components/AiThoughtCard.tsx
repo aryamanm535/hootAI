@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
-import type { MarketThought } from "@/lib/types"
+import type { LearnPack, MarketThought } from "@/lib/types"
 import { clsx } from "clsx"
 
 const borderByAction: Record<string, string> = {
@@ -20,7 +20,15 @@ const badgeByAction: Record<string, string> = {
   ERROR: "bg-red-500/15 text-red-300",
 }
 
-export default function AiThoughtCard({ item, i }: { item: MarketThought; i: number }) {
+export default function AiThoughtCard({
+  item,
+  i,
+  onLaunchLearn,
+}: {
+  item: MarketThought
+  i: number
+  onLaunchLearn?: (pack: LearnPack, dest: "driver" | "quiz" | "trade" | "flashcards" | "mastery") => void
+}) {
   const action = item.action in borderByAction ? item.action : "WATCH"
 
   return (
@@ -63,6 +71,34 @@ export default function AiThoughtCard({ item, i }: { item: MarketThought; i: num
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {item.learn && onLaunchLearn ? (
+        <div className="mt-3 border-t border-zinc-800/80 pt-3">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+            Learn actions
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                { id: "driver" as const, label: "Play driver" },
+                { id: "quiz" as const, label: "Play quiz" },
+                { id: "trade" as const, label: "Paper trade" },
+                { id: "flashcards" as const, label: "Flashcards" },
+                { id: "mastery" as const, label: "Mastery" },
+              ] as const
+            ).map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => onLaunchLearn(item.learn as LearnPack, b.id)}
+                className="rounded-md border border-zinc-700 bg-zinc-950/40 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 hover:border-emerald-500/40 hover:text-emerald-200"
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
       ) : null}
     </motion.article>
   )

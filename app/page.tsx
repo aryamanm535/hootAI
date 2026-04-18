@@ -4,9 +4,19 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import StockChart from "@/components/StockChart"
 import AiThoughtCard from "@/components/AiThoughtCard"
 import PortfolioNewsPanel from "@/components/PortfolioNewsPanel"
+import LearnGamePanel from "@/components/LearnGamePanel"
+import FlashcardsPanel from "@/components/FlashcardsPanel"
+import MasteryPanel from "@/components/MasteryPanel"
 import { useLocalPortfolio } from "@/hooks/useLocalPortfolio"
+import { useLearningStore } from "@/hooks/useLearningStore"
 import { buildSimulatedSeries } from "@/lib/chartSeries"
-import { CHART_TIMEFRAMES, type ChartSelectionRange, type ChartTimeframe, type MarketThought } from "@/lib/types"
+import {
+  CHART_TIMEFRAMES,
+  type ChartSelectionRange,
+  type ChartTimeframe,
+  type LearnPack,
+  type MarketThought,
+} from "@/lib/types"
 
 const PRESETS = ["AAPL", "NVDA", "TSLA"] as const
 
@@ -16,17 +26,23 @@ const EXPLAIN_CLIENT_MS = Math.max(
   Number(process.env.NEXT_PUBLIC_EXPLAIN_CLIENT_TIMEOUT_MS ?? 22_000)
 )
 
-type Tab = "terminal" | "news"
+type Tab = "terminal" | "news" | "learn"
+type LearnTab = "game" | "flashcards" | "mastery"
+type GameSection = "driver" | "quiz" | "trade"
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("terminal")
+  const [learnTab, setLearnTab] = useState<LearnTab>("game")
+  const [gameSection, setGameSection] = useState<GameSection>("driver")
   const [feed, setFeed] = useState<MarketThought[]>([])
+  const [lastPack, setLastPack] = useState<LearnPack | null>(null)
   const [chartSymbol, setChartSymbol] = useState("AAPL")
   const [symbolDraft, setSymbolDraft] = useState("")
   const [chartBusy, setChartBusy] = useState(false)
   const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>("1D")
   const [newTicker, setNewTicker] = useState("")
   const portfolio = useLocalPortfolio()
+  const learning = useLearningStore()
 
   const sym = chartSymbol.trim().toUpperCase()
   const chartData = useMemo(
@@ -77,6 +93,10 @@ export default function Home() {
           return
         }
         setFeed((p) => [data, ...p].slice(0, 40))
+        if (data.learn) {
+          learning.ingestLearnPack(data.learn)
+          setLastPack(data.learn)
+        }
       } catch (e) {
         const msg =
           e instanceof Error
@@ -97,7 +117,23 @@ export default function Home() {
         setChartBusy(false)
       }
     },
-    [sym]
+    [learning, sym]
+  )
+
+  const launchLearn = useCallback(
+    (pack: LearnPack, dest: "driver" | "quiz" | "trade" | "flashcards" | "mastery") => {
+      setLastPack(pack)
+      if (dest === "flashcards") {
+        setLearnTab("flashcards")
+      } else if (dest === "mastery") {
+        setLearnTab("mastery")
+      } else {
+        setLearnTab("game")
+        setGameSection(dest)
+      }
+      setTab("learn")
+    },
+    []
   )
 
   const applyChartSymbol = (raw: string) => {
@@ -138,6 +174,17 @@ export default function Home() {
             }`}
           >
             Portfolio news
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("learn")}
+            className={`rounded-md border px-4 py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
+              tab === "learn"
+                ? "border-amber-500/50 bg-amber-500/10 text-amber-100"
+                : "border-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+            }`}
+          >
+            Learn
           </button>
         </nav>
       </header>
@@ -278,6 +325,7 @@ export default function Home() {
                     key={`${i}-${item.ticker}-${item.confidence}-${item.action}-${item.thought.length}`}
                     item={item}
                     i={i}
+                    onLaunchLearn={launchLearn}
                   />
                 ))
               )}
@@ -285,6 +333,71 @@ export default function Home() {
           </section>
         </div>
       ) : (
+        tab === "learn" ? (
+          <div className="flex min-h-0 flex-1">
+            <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-800/90 bg-[#050508]">
+              <div className="border-b border-zinc-800/90 p-4">
+                <h2 className="font-mono text-sm font-semibold text-zinc-200">Learn</h2>
+                <p className="mt-1 font-mono text-[10px] leading-relaxed text-zinc-500">
+                  Game + flashcards + mastery. Terms and performance are stored in this browser.
+                </p>
+              </div>
+              <div className="border-b border-zinc-800/90 p-3">
+                <div className="flex gap-1">
+                  {(["game", "flashcards", "mastery"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setLearnTab(t)}
+                      className={`rounded-md border px-3 py-2 font-mono text-[11px] uppercase transition-colors ${
+                        learnTab === t
+                          ? "border-amber-500/50 bg-amber-500/10 text-amber-100"
+                          : "border-transparent text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3">
+                <div className="rounded-lg border border-zinc-800/90 bg-zinc-950/40 p-3">
+                  <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                    Latest selection
+                  </div>
+                  <div className="mt-1 font-mono text-xs text-zinc-200">
+                    {lastPack ? `${lastPack.rangeLabel} · ${lastPack.timeframe}` : "—"}
+                  </div>
+                  <div className="mt-2 font-mono text-[11px] text-zinc-500">
+                    Terms tracked: <span className="text-zinc-200">{Object.keys(learning.store.terms).length}</span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {learnTab === "game" ? (
+                <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
+                  {lastPack ? (
+                    <LearnGamePanel
+                      pack={lastPack}
+                      onAttempt={learning.recordAttempt}
+                      initialSection={gameSection}
+                    />
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-zinc-800 p-8 text-center font-mono text-sm text-zinc-500">
+                      Select a chart range in Terminal to generate a game pack.
+                    </div>
+                  )}
+                </div>
+              ) : learnTab === "flashcards" ? (
+                <FlashcardsPanel />
+              ) : (
+                <MasteryPanel />
+              )}
+            </main>
+          </div>
+        ) : (
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-[260px] shrink-0 flex-col border-r border-zinc-800/90 bg-[#050508]">
             <div className="border-b border-zinc-800/90 p-4">
@@ -334,6 +447,7 @@ export default function Home() {
           </aside>
           <PortfolioNewsPanel tickers={portfolio.symbols} ready={portfolio.ready} />
         </div>
+        )
       )}
     </div>
   )

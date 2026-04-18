@@ -1,13 +1,26 @@
-import type { ChartTimeframe, MarketThought, PortfolioNewsItem } from "./types"
+import type {
+  ChartTimeframe,
+  LearnPack,
+  LearnTerm,
+  LearnTopic,
+  MarketThought,
+  PortfolioNewsItem,
+} from "./types"
 
-const MODEL = "gemini-2.5-flash"
+/**
+ * LLM provider
+ * - Groq: OpenAI-compatible Chat Completions API
+ * - Gemini fallback: kept only if GROQ_API_KEY is absent
+ */
+const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.1-8b-instant"
+const GEMINI_MODEL = "gemini-2.5-flash"
 
-/** Serialize Gemini calls so /stream + /explain never burst parallel requests (major 429 source). */
-let geminiChain: Promise<void> = Promise.resolve()
+/** Serialize LLM calls so /news + /explain never burst parallel requests (major 429 source). */
+let llmChain: Promise<void> = Promise.resolve()
 
-function withGeminiQueue<T>(fn: () => Promise<T>): Promise<T> {
-  const run = geminiChain.then(fn, fn)
-  geminiChain = run.then(
+function withLlmQueue<T>(fn: () => Promise<T>): Promise<T> {
+  const run = llmChain.then(fn, fn)
+  llmChain = run.then(
     () => undefined,
     () => undefined
   )
@@ -108,8 +121,168 @@ const EXPLAIN_RESPONSE_SCHEMA = {
     confidence: { type: "INTEGER" },
     action: { type: "STRING" },
     regionLabel: { type: "STRING" },
+    learn: {
+      type: "OBJECT",
+      properties: {
+        rangeLabel: { type: "STRING" },
+        timeframe: { type: "STRING" },
+        topics: { type: "ARRAY", items: { type: "STRING" } },
+        terms: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              id: { type: "STRING" },
+              term: { type: "STRING" },
+              definition: { type: "STRING" },
+              topic: { type: "STRING" },
+              example: { type: "STRING" },
+            },
+            required: ["id", "term", "definition", "topic"],
+          },
+        },
+        quiz: {
+          type: "ARRAY",
+          items: {
+            type: "OBJECT",
+            properties: {
+              id: { type: "STRING" },
+              topic: { type: "STRING" },
+              prompt: { type: "STRING" },
+              choices: { type: "ARRAY", items: { type: "STRING" } },
+              correctIndex: { type: "INTEGER" },
+              explanation: { type: "STRING" },
+            },
+            required: ["id", "topic", "prompt", "choices", "correctIndex", "explanation"],
+          },
+        },
+        driverGame: {
+          type: "OBJECT",
+          properties: {
+            prompt: { type: "STRING" },
+            choices: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  label: { type: "STRING" },
+                  topic: { type: "STRING" },
+                },
+                required: ["label", "topic"],
+              },
+            },
+            correctIndex: { type: "INTEGER" },
+            explanation: { type: "STRING" },
+          },
+          required: ["prompt", "choices", "correctIndex", "explanation"],
+        },
+        tradeIdea: {
+          type: "OBJECT",
+          properties: {
+            direction: { type: "STRING" },
+            thesis: { type: "STRING" },
+            risk: { type: "STRING" },
+            invalidation: { type: "STRING" },
+          },
+          required: ["direction", "thesis", "risk", "invalidation"],
+        },
+      },
+      required: ["rangeLabel", "timeframe", "topics", "terms", "quiz", "driverGame", "tradeIdea"],
+    },
   },
   required: ["ticker", "thought", "reasoning", "confidence", "action"],
+}
+
+const TOPICS: LearnTopic[] = ["Macro", "Earnings", "Technicals", "Sentiment", "Risk", "MarketStructure"]
+function normTopic(raw: unknown): LearnTopic {
+  const s = String(raw ?? "").toLowerCase()
+  const hit = TOPICS.find((t) => t.toLowerCase() === s)
+  if (hit) return hit
+  if (s.includes("tech")) return "Technicals"
+  if (s.includes("earn")) return "Earnings"
+  if (s.includes("sent")) return "Sentiment"
+  if (s.includes("structure") || s.includes("micro")) return "MarketStructure"
+  if (s.includes("risk")) return "Risk"
+  return "Macro"
+}
+
+function coerceLearnPack(raw: unknown, timeframe: ChartTimeframe, rangeLabel: string): LearnPack | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const o = raw as Record<string, unknown>
+  const topics = Array.isArray(o.topics) ? o.topics.map(normTopic) : []
+  const terms: LearnTerm[] = Array.isArray(o.terms)
+    ? o.terms
+        .slice(0, 16)
+        .map((x, i) => {
+          const t = x as Record<string, unknown>
+          const term = String(t.term ?? "").trim()
+          if (!term) return null
+          const id = String(t.id ?? `${term.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${i}`)
+          const example = t.example != null ? String(t.example).trim() : ""
+          const out: LearnTerm = {
+            id,
+            term,
+            definition: String(t.definition ?? "").trim(),
+            topic: normTopic(t.topic),
+          }
+          if (example) out.example = example
+          return out
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+    : []
+  const quiz = Array.isArray(o.quiz)
+    ? o.quiz
+        .slice(0, 8)
+        .map((x, i) => {
+          const q = x as Record<string, unknown>
+          const rawChoices = Array.isArray(q.choices) ? q.choices.map((c) => String(c).trim()) : []
+          const choices =
+            rawChoices.filter(Boolean).length >= 2
+              ? rawChoices.filter(Boolean).slice(0, 6)
+              : ["A", "B", "C", "D"]
+          return {
+            id: String(q.id ?? `q-${i}`),
+            topic: normTopic(q.topic),
+            prompt: String(q.prompt ?? ""),
+            choices,
+            correctIndex: Math.max(0, Math.min(choices.length - 1, Number(q.correctIndex ?? 0) || 0)),
+            explanation: String(q.explanation ?? ""),
+          }
+        })
+    : []
+  const dg = (o.driverGame ?? {}) as Record<string, unknown>
+  const driverChoices = Array.isArray(dg.choices)
+    ? dg.choices
+        .slice(0, 6)
+        .map((c) => ({
+          label: String((c as Record<string, unknown>).label ?? "").trim(),
+          topic: normTopic((c as Record<string, unknown>).topic),
+        }))
+        .filter((c) => c.label.length > 0)
+    : []
+  const driverGame = {
+    prompt: String(dg.prompt ?? "Pick the best driver."),
+    choices: driverChoices.length > 0 ? driverChoices : TOPICS.slice(0, 4).map((t) => ({ label: t, topic: t })),
+    correctIndex: Math.max(0, Math.min(driverChoices.length - 1, Number(dg.correctIndex ?? 0) || 0)),
+    explanation: String(dg.explanation ?? ""),
+  }
+  const ti = (o.tradeIdea ?? {}) as Record<string, unknown>
+  const direction = String(ti.direction ?? "LONG").toUpperCase() === "SHORT" ? "SHORT" : "LONG"
+  const tradeIdea = {
+    direction: direction as "LONG" | "SHORT",
+    thesis: String(ti.thesis ?? ""),
+    risk: String(ti.risk ?? ""),
+    invalidation: String(ti.invalidation ?? ""),
+  }
+  return {
+    rangeLabel: String(o.rangeLabel ?? rangeLabel),
+    timeframe: (String(o.timeframe ?? timeframe) as ChartTimeframe) ?? timeframe,
+    topics: topics.length ? topics.slice(0, 4) : ["Macro", "Technicals", "Sentiment"],
+    terms,
+    quiz,
+    driverGame,
+    tradeIdea,
+  }
 }
 
 function clampConfidence(n: unknown): number {
@@ -155,92 +328,134 @@ export function coerceMarketThought(raw: unknown, fallbackTicker: string): Marke
   }
 }
 
-export type GeminiCallOptions = {
+export type LlmCallOptions = {
   /** Wall-clock per HTTP attempt (undici / browser AbortSignal.timeout). */
   timeoutMs?: number
   maxRetries?: number
   maxOutputTokens?: number
   temperature?: number
-  /** When set, Gemini returns JSON matching this schema (API may 400 on older models — we retry without it). */
-  responseSchema?: Record<string, unknown>
 }
 
-async function callGemini(prompt: string, options: GeminiCallOptions = {}): Promise<string> {
-  const key = process.env.GEMINI_API_KEY
-  if (!key) {
-    throw new Error("GEMINI_API_KEY is not set")
+async function callGroq(prompt: string, options: LlmCallOptions = {}): Promise<string> {
+  const key = process.env.GROQ_API_KEY
+  if (!key) throw new Error("GROQ_API_KEY is not set")
+
+  const timeoutMs = options.timeoutMs ?? 45_000
+  const maxRetries = options.maxRetries ?? Math.max(0, Math.min(8, Number(process.env.LLM_MAX_RETRIES ?? 3)))
+  const maxTokens = options.maxOutputTokens ?? 2048
+  const temperature = options.temperature ?? 0.7
+
+  const url = "https://api.groq.com/openai/v1/chat/completions"
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature,
+          max_tokens: maxTokens,
+          // Ask for JSON object output; still keep parseModelJson as safety.
+          response_format: { type: "json_object" },
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are Market Mind Stream. Always output ONLY valid JSON (no markdown, no extra text).",
+            },
+            { role: "user", content: prompt },
+          ],
+        }),
+      })
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error(`Groq request timed out after ${timeoutMs}ms`)
+      }
+      throw e
+    }
+
+    const json = (await res.json()) as Record<string, unknown>
+    if (res.ok) {
+      const content =
+        (json as any)?.choices?.[0]?.message?.content ??
+        (json as any)?.choices?.[0]?.delta?.content
+      if (typeof content !== "string") throw new Error("Empty model response")
+      return content
+    }
+
+    const retriable = res.status === 429 || res.status === 503 || res.status === 408
+    if (!retriable || attempt === maxRetries) {
+      throw new Error(`Groq error ${res.status}: ${JSON.stringify(json)}`)
+    }
+    await sleep(backoffMsForAttempt(res, json, attempt))
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`
+  throw new Error("Groq: retries exhausted")
+}
+
+async function callGeminiFallback(prompt: string, options: LlmCallOptions = {}): Promise<string> {
+  const key = process.env.GEMINI_API_KEY
+  if (!key) throw new Error("GEMINI_API_KEY is not set")
+
   const timeoutMs = options.timeoutMs ?? 45_000
-  const maxRetries =
-    options.maxRetries ?? Math.max(0, Math.min(8, Number(process.env.GEMINI_MAX_RETRIES ?? 4)))
+  const maxRetries = options.maxRetries ?? Math.max(0, Math.min(8, Number(process.env.LLM_MAX_RETRIES ?? 3)))
   const maxOutputTokens = options.maxOutputTokens ?? 2048
   const temperature = options.temperature ?? 0.72
 
-  const buildBody = (includeSchema: boolean) => {
-    const generationConfig: Record<string, unknown> = {
-      temperature,
-      responseMimeType: "application/json",
-      maxOutputTokens,
-    }
-    if (includeSchema && options.responseSchema) {
-      generationConfig.responseSchema = options.responseSchema
-    }
-    return JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig,
-    })
-  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const useSchema = Boolean(options.responseSchema)
-
-    const doFetch = async (includeSchema: boolean): Promise<Response> => {
-      try {
-        return await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: AbortSignal.timeout(timeoutMs),
-          body: buildBody(includeSchema),
-        })
-      } catch (e) {
-        if (e instanceof Error && e.name === "AbortError") {
-          throw new Error(`Gemini request timed out after ${timeoutMs}ms`)
-        }
-        throw e
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(timeoutMs),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature,
+            responseMimeType: "application/json",
+            maxOutputTokens,
+          },
+        }),
+      })
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        throw new Error(`Gemini request timed out after ${timeoutMs}ms`)
       }
+      throw e
     }
 
-    let res = await doFetch(useSchema)
-    let json = (await res.json()) as Record<string, unknown>
-
-    if (!res.ok && useSchema && (res.status === 400 || res.status === 404)) {
-      res = await doFetch(false)
-      json = (await res.json()) as Record<string, unknown>
-    }
-
+    const json = (await res.json()) as Record<string, unknown>
     if (res.ok) {
       const candidates = json?.candidates as
         | Array<{ content?: { parts?: Array<{ text?: string }> } }>
         | undefined
       const text = candidates?.[0]?.content?.parts?.[0]?.text
-      if (typeof text !== "string") {
-        throw new Error("Empty model response")
-      }
+      if (typeof text !== "string") throw new Error("Empty model response")
       return text
     }
 
     const retriable = res.status === 429 || res.status === 503 || res.status === 408
     if (!retriable || attempt === maxRetries) {
-      const msg = JSON.stringify(json)
-      throw new Error(`Gemini error ${res.status}: ${msg}`)
+      throw new Error(`Gemini error ${res.status}: ${JSON.stringify(json)}`)
     }
-
     await sleep(backoffMsForAttempt(res, json, attempt))
   }
 
   throw new Error("Gemini: retries exhausted")
+}
+
+async function callLlm(prompt: string, options: LlmCallOptions = {}): Promise<string> {
+  if (process.env.GROQ_API_KEY) return callGroq(prompt, options)
+  return callGeminiFallback(prompt, options)
 }
 
 /** Live “desk analyst” stream — one JSON object per call */
@@ -264,9 +479,9 @@ Return ONLY valid JSON matching this shape:
 }`
 
   try {
-    const text = await withGeminiQueue(async () => {
+    const text = await withLlmQueue(async () => {
       await enforceLiveMinGap(ticker)
-      return callGemini(prompt, { timeoutMs: 45_000, maxRetries: 3, maxOutputTokens: 512 })
+      return callLlm(prompt, { timeoutMs: 45_000, maxRetries: 3, maxOutputTokens: 512 })
     })
     const parsed = parseModelJson(text, "live thought")
     const out = coerceMarketThought(parsed, ticker)
@@ -315,7 +530,12 @@ export async function generateRegionExplanation(
     2
   )}% (${dir}). Context: ${rangeSummary}
 
-In ≤70 words in "thought", explain why price likely moved ${dir}. Exactly 3 strings in "reasoning" (very short). Use only valid JSON strings (escape quotes inside text). No markdown.
+In "thought" (≤70 words), explain why price likely moved ${dir}. Exactly 3 strings in "reasoning" (very short). Then include a "learn" object to power a game + flashcards:
+- terms: 5-8 key terms with 1-line definitions + topic
+- quiz: 3 multiple-choice questions with answer + explanation
+- driverGame: pick best driver category
+- tradeIdea: a paper-trade idea (not advice)
+Use only valid JSON strings (escape quotes inside text). No markdown.
 
 {
   "ticker": "${ticker}",
@@ -324,22 +544,32 @@ In ≤70 words in "thought", explain why price likely moved ${dir}. Exactly 3 st
   "confidence": 72,
   "action": "EXPLAIN",
   "regionLabel": "${stats.startLabel}–${stats.endLabel}"
+  ,"learn": {
+    "rangeLabel": "${stats.startLabel}–${stats.endLabel}",
+    "timeframe": "${stats.timeframe}",
+    "topics": ["Macro","Technicals","Sentiment"],
+    "terms": [{"id":"t1","term":"...","definition":"...","topic":"Macro"}],
+    "quiz": [{"id":"q1","topic":"Technicals","prompt":"...","choices":["A","B","C","D"],"correctIndex": 1,"explanation":"..."}],
+    "driverGame": {"prompt":"Best driver?","choices":[{"label":"Rates","topic":"Macro"},{"label":"Earnings","topic":"Earnings"},{"label":"Momentum","topic":"Technicals"},{"label":"Risk-off","topic":"Sentiment"}],"correctIndex": 2,"explanation":"..."},
+    "tradeIdea": {"direction":"LONG","thesis":"...","risk":"...","invalidation":"..."}
+  }
 }`
 
   try {
-    const text = await withGeminiQueue(() =>
-      callGemini(prompt, {
+    const text = await withLlmQueue(() =>
+      callLlm(prompt, {
         timeoutMs: EXPLAIN_BUDGET_MS,
         maxRetries: 0,
         maxOutputTokens: 1024,
         temperature: 0.35,
-        responseSchema: EXPLAIN_RESPONSE_SCHEMA,
       })
     )
     const parsed = parseModelJson(text, "chart explain")
     const thought = coerceMarketThought(parsed, ticker)
     thought.action = "EXPLAIN"
     thought.regionLabel = thought.regionLabel ?? `${stats.startLabel}–${stats.endLabel}`
+    const p = parsed as Record<string, unknown>
+    thought.learn = coerceLearnPack(p.learn, stats.timeframe, thought.regionLabel)
     return thought
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error"
@@ -419,8 +649,8 @@ Rules:
 - Sort items by impactScore descending in the array.`
 
   try {
-    const text = await withGeminiQueue(() =>
-      callGemini(prompt, {
+    const text = await withLlmQueue(() =>
+      callLlm(prompt, {
         timeoutMs: NEWS_BUDGET_MS,
         maxRetries: 0,
         maxOutputTokens: 900,

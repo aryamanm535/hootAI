@@ -8,6 +8,8 @@ export type MarketThought = {
   action: MarketAction
   /** Present for chart-region explanations */
   regionLabel?: string
+  /** Optional learning payload for games/flashcards */
+  learn?: LearnPack
 }
 
 /** Simulated series horizon (labels + bar count change per range). */
@@ -39,6 +41,81 @@ export type ChartSelectionRange = {
   startPrice: number
   endPrice: number
   pctChange: number
+}
+
+export type LearnTopic = "Macro" | "Earnings" | "Technicals" | "Sentiment" | "Risk" | "MarketStructure"
+
+export type LearnTerm = {
+  id: string
+  term: string
+  definition: string
+  topic: LearnTopic
+  example?: string
+}
+
+export type LearnQuizQuestion = {
+  id: string
+  topic: LearnTopic
+  prompt: string
+  choices: string[]
+  correctIndex: number
+  explanation: string
+}
+
+export type LearnDriverChoice = {
+  label: string
+  topic: LearnTopic
+}
+
+export type LearnDriverGame = {
+  prompt: string
+  choices: LearnDriverChoice[]
+  correctIndex: number
+  explanation: string
+}
+
+export type PaperTradeIdea = {
+  direction: "LONG" | "SHORT"
+  thesis: string
+  risk: string
+  invalidation: string
+}
+
+export type LearnPack = {
+  rangeLabel: string
+  timeframe: ChartTimeframe
+  topics: LearnTopic[]
+  terms: LearnTerm[]
+  quiz: LearnQuizQuestion[]
+  driverGame: LearnDriverGame
+  tradeIdea: PaperTradeIdea
+}
+
+export type FlashcardState = {
+  termId: string
+  box: 1 | 2 | 3 | 4 | 5
+  dueAt: number
+  lastGrade?: 0 | 1 | 2 | 3
+  seenCount: number
+  correctCount: number
+}
+
+export type QuizAttempt = {
+  id: string
+  ts: number
+  questionId: string
+  topic: LearnTopic
+  correct: boolean
+  selectedIndex: number
+  confidence: 0 | 1 | 2 | 3
+}
+
+export type TopicMastery = {
+  topic: LearnTopic
+  score: number // 0-100
+  attempts: number
+  correct: number
+  streak: number
 }
 
 /** Gemini-generated portfolio “news desk” line (not live wire copy). */

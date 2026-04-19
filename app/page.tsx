@@ -701,8 +701,13 @@ function TopNav({
         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-400/30 bg-emerald-400/10">
           <Owl pose="idle" size={24} />
         </div>
-        <div className="text-base font-semibold tracking-tight text-white">
-          <span className="brand-gradient-text">Hoot</span>
+        <div className="flex items-baseline gap-2">
+          <div className="text-base font-semibold tracking-tight text-white">
+            <span className="brand-gradient-text">Hoot</span>
+          </div>
+          <div className="hidden text-[11px] font-medium text-slate-500 sm:block">
+            · markets made simple
+          </div>
         </div>
       </button>
       <nav className="ml-6 flex gap-1">

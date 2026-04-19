@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hoot — Understand why the market moves",
+  title: "Hoot — markets made simple",
   description:
     "Your AI owl tutor for the markets. Explore charts, get real-time explanations for price moves, and learn markets through interactive quizzes.",
 };

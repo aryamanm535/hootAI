@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hoot — markets made simple
 
-## Getting Started
+An AI owl tutor that turns any stock chart into an interactive lesson. Drag across a region of the chart and Hoot explains, in plain English, *why* the price moved — then quizzes you on it and builds flashcards from the new terms.
 
-First, run the development server:
+Built for Hook 'Em Hacks 2026 at UT Austin.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+**Live demo:** [use-hoot.vercel.app](https://use-hoot.vercel.app/)
+**Demo video:** [youtu.be/4kQi3DuMSqk](https://youtu.be/4kQi3DuMSqk)
+
+---
+
+## The idea
+
+When you open a stock chart, all you see is a line going up and down — you don't see *why*. And every explanation online assumes you already know the jargon. Hoot is a friendly tutor that sits on your shoulder while you browse the markets and explains things as you go. No finance background required.
+
+## Features
+
+- **Drag-to-explain charts.** Highlight any slice of a price chart and Gemini writes up what happened, ranks the drivers by importance, and flags any terms a beginner wouldn't know.
+- **Auto-generated quizzes.** Every explanation spins up a short quiz tied to that exact move — driver questions, term definitions, direction calls. Earn XP for correct answers.
+- **Spaced-repetition flashcards.** Terms you miss get dropped into a flashcard deck and resurfaced on a Leitner-style schedule so they actually stick.
+- **Mastery dashboard.** See accuracy per topic (Macro, Earnings, Technicals, Sentiment, Risk, Market Structure) so you know what you're weak on.
+- **Finance-only chatbot with live prices.** Ask the owl anything about markets. It pulls live Yahoo Finance quotes before responding, so "what's Apple trading at?" actually works — no "I don't have real-time access" cop-outs.
+- **Gamified progress.** XP, ranks, and badge unlocks for hitting milestones. Progress persists locally, no account required.
+- **Candles or line view.** Toggle between a smoothed line and full OHLC candles on any timeframe (1D through 5Y).
+
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router, Turbopack) with React 19 and TypeScript
+- **Styling:** Tailwind CSS v4, Framer Motion for animations
+- **Charts:** Recharts + custom SVG overlays for the candle layer
+- **AI:**
+  - **Gemini** for region explanations and learn-pack generation (quizzes, flashcard terms, trade ideas)
+  - **Groq** (`llama-3.1-8b-instant`) for the conversational chatbot
+- **Market data:** `yahoo-finance2` for live quotes and historical candles, Finnhub as a fallback
+- **Persistence:** `localStorage` — everything stays client-side, no backend required
+- **Deployment:** Vercel
+
+## Project structure
+
+```
+app/
+  api/
+    chart/     — historical OHLC data
+    chat/      — finance chatbot (Groq + live Yahoo quotes)
+    explain/   — Gemini region explanations + learn packs
+    news/      — market headlines
+  page.tsx     — main UI (Home, Chart, Learn, You tabs)
+components/
+  StockChart.tsx        — chart with drag-to-select
+  AiThoughtCard.tsx     — explanation + quiz card
+  FlashcardsPanel.tsx   — spaced-repetition review
+  MasteryPanel.tsx      — per-topic accuracy dashboard
+  FinanceChatbot.tsx    — owl chatbot popup
+  CompanionOwl.tsx      — floating owl mascot
+  Owl.tsx               — owl SVG (three poses)
+hooks/
+  useLearningStore.ts   — flashcards, attempts, mastery math
+  useGameProfile.ts     — XP, ranks, badges
+lib/
+  ai.ts                 — Gemini prompt + learn-pack synthesis
+  marketChart.ts        — price fetching + downsampling
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Running locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+cp .env.local.example .env.local   # fill in keys
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Then open [localhost:3000](http://localhost:3000).
 
-## Learn More
+### Required env vars
 
-To learn more about Next.js, take a look at the following resources:
+```
+GROQ_API_KEY=      # for the chatbot
+GEMINI_API_KEY=    # for chart explanations
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Optional
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+GROQ_MODEL=llama-3.1-8b-instant
+FINNHUB_API_KEY=   # fallback market data source
+```
 
-## Deploy on Vercel
+## Hackathon tracks
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Intelligent Financial & Market Systems** — primary track
+- **Best Use of Gemini API** — Gemini powers the core chart-explanation and learn-pack generation loop
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Team
+
+Built in 24 hours at Hook 'Em Hacks 2026.

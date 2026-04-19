@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#04070d"/>
+      <stop offset="60%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#0a1a1a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.5" r="0.55">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#10b981" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="owl-body" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#4b5563"/>
+      <stop offset="55%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="owl-belly" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#e2e8f0"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="wordmark" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#a7f3d0"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <radialGradient id="eye-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Subtle grid lines hinting at a chart -->
+  <g stroke="#10b981" stroke-opacity="0.05" stroke-width="1">
+    <line x1="0" y1="140" x2="1200" y2="140"/>
+    <line x1="0" y1="280" x2="1200" y2="280"/>
+    <line x1="0" y1="420" x2="1200" y2="420"/>
+    <line x1="0" y1="560" x2="1200" y2="560"/>
+  </g>
+  <!-- Faint chart line in the background -->
+  <path d="M 0 420 L 150 400 L 280 430 L 420 360 L 560 380 L 700 300 L 840 320 L 980 240 L 1200 200"
+        fill="none" stroke="#10b981" stroke-opacity="0.18" stroke-width="2.5"/>
+
+  <!-- Owl group, centered on the left -->
+  <g transform="translate(180, 170) scale(3.0)">
+    <!-- Body -->
+    <path d="M32 10c10 0 18 7 18 18v10c0 9-8 16-18 16S14 47 14 38V28c0-11 8-18 18-18z"
+          fill="url(#owl-body)" stroke="#34d399" stroke-width="0.8"/>
+    <!-- Ear tufts -->
+    <path d="M17 12 L20 5 L24 13 Z" fill="#1f2937"/>
+    <path d="M40 13 L44 5 L47 12 Z" fill="#1f2937"/>
+    <!-- Wings -->
+    <path d="M15 28 Q12 38 16 48 Q20 42 19 32 Z" fill="#0f172a" opacity="0.85"/>
+    <path d="M49 28 Q52 38 48 48 Q44 42 45 32 Z" fill="#0f172a" opacity="0.85"/>
+    <!-- Brow accent -->
+    <path d="M20 18c3-3 7-3 10 0-2 4-7 4-10 0z" fill="#34d399" opacity="0.9"/>
+    <path d="M34 18c3-3 7-3 10 0-2 4-7 4-10 0z" fill="#34d399" opacity="0.9"/>
+    <!-- Belly -->
+    <ellipse cx="32" cy="42" rx="9" ry="10" fill="url(#owl-belly)" opacity="0.85"/>
+    <!-- Eye glows -->
+    <circle cx="24" cy="28" r="8" fill="url(#eye-glow)"/>
+    <circle cx="40" cy="28" r="8" fill="url(#eye-glow)"/>
+    <!-- Eyes -->
+    <circle cx="24" cy="28" r="6" fill="#f8fafc"/>
+    <circle cx="40" cy="28" r="6" fill="#f8fafc"/>
+    <circle cx="24" cy="28" r="2.8" fill="#0f172a"/>
+    <circle cx="40" cy="28" r="2.8" fill="#0f172a"/>
+    <circle cx="24.8" cy="27.2" r="0.9" fill="#ffffff"/>
+    <circle cx="40.8" cy="27.2" r="0.9" fill="#ffffff"/>
+    <!-- Beak -->
+    <path d="M29 34 L32 38 L35 34 L32 36 Z" fill="#fbbf24"/>
+    <!-- Feet -->
+    <path d="M27 54 L27 58 M31 54 L31 58 M33 54 L33 58 M37 54 L37 58" stroke="#fbbf24" stroke-width="1" stroke-linecap="round"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="470" y="335"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="220"
+        font-weight="800"
+        letter-spacing="-8"
+        fill="url(#wordmark)">Hoot</text>
+
+  <!-- Tagline -->
+  <text x="478" y="400"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+        font-size="32"
+        font-weight="500"
+        letter-spacing="1"
+        fill="#94a3b8">markets made simple</text>
+
+  <!-- Small pill label -->
+  <g transform="translate(478, 430)">
+    <rect x="0" y="0" width="280" height="36" rx="18" fill="#10b981" fill-opacity="0.12" stroke="#10b981" stroke-opacity="0.4" stroke-width="1"/>
+    <text x="18" y="24"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-size="14"
+          font-weight="600"
+          letter-spacing="2"
+          fill="#6ee7b7">AI OWL TUTOR FOR THE MARKETS</text>
+  </g>
+</svg>

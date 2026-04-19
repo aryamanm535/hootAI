@@ -5,7 +5,8 @@ An AI owl tutor that turns any stock chart into an interactive lesson. Drag acro
 Built for Hook 'Em Hacks 2026 at UT Austin.
 
 **Live demo:** [use-hoot.vercel.app](https://use-hoot.vercel.app/)
-**Demo video:** [youtu.be/4kQi3DuMSqk](https://youtu.be/4kQi3DuMSqk)
+
+[![Watch the demo](https://img.youtube.com/vi/4kQi3DuMSqk/maxresdefault.jpg)](https://youtu.be/4kQi3DuMSqk)
 
 ---
 

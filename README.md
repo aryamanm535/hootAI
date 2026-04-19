@@ -1,4 +1,4 @@
-# Hoot — markets made simple
+# Hoot — markets made simple 
 
 An AI owl tutor that turns any stock chart into an interactive lesson. Drag across a region of the chart and Hoot explains, in plain English, *why* the price moved — then quizzes you on it and builds flashcards from the new terms.
 

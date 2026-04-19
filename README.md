@@ -1,5 +1,5 @@
-# Hoot — markets made simple - https://use-hoot.vercel.app/
-
+# Hoot — markets made simple 
+https://use-hoot.vercel.app/
 An AI owl tutor that turns any stock chart into an interactive lesson. Drag across a region of the chart and Hoot explains, in plain English, *why* the price moved — then quizzes you on it and builds flashcards from the new terms.
 
 Built for Hook 'Em Hacks 2026 at UT Austin.
